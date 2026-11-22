@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Machu Picchu</title>
+<style>
+  :root { --ink: #f6eee1; --gold: #e2ae4a; --ground: #14100b; }
+  html, body { margin: 0; height: 100%; background: var(--ground); color: var(--ink); font: 14px/1.4 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; overflow: hidden; }
+  #stage, #film { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #film { outline: none; }
+  #film.can { cursor: pointer; }
+  /* Before the walk is shown: one thin line that fills as the first seconds arrive. */
+  #load { position: absolute; left: 50%; top: 50%; width: 180px; height: 2px; margin-left: -90px; background: rgba(246, 238, 225, 0.18); transition: opacity 0.6s; }
+  #load i { display: block; height: 100%; width: 0; background: var(--gold); transition: width 0.3s; }
+  #load.off { opacity: 0; pointer-events: none; }
+  /* Where the walker is: shown when the place changes or the pointer moves, then it withdraws. */
+  #place { position: absolute; left: 50%; bottom: 34px; width: min(420px, 60vw); transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity 0.5s; pointer-events: none; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
+  #place.on { opacity: 1; pointer-events: auto; }
+  #place strong { font-weight: 500; letter-spacing: 0.08em; }
+  #line { position: relative; height: 14px; margin-top: 8px; cursor: pointer; }
+  #line::before { content: ""; position: absolute; left: 0; right: 0; top: 6px; height: 1px; background: rgba(246, 238, 225, 0.4); }
+  #bar { position: absolute; left: 0; top: 6px; height: 1px; background: var(--gold); }
+  #line button { position: absolute; top: 2px; width: 9px; height: 9px; margin-left: -4px; padding: 0; border: 1px solid var(--ink); border-radius: 50%; background: var(--ground); cursor: pointer; }
+  #line button.on { background: var(--gold); border-color: var(--gold); }
+  #tools { position: absolute; right: 22px; bottom: 26px; display: flex; gap: 14px; align-items: center; }
+  #tools button { background: none; border: 0; padding: 4px 2px; color: var(--ink); font: inherit; letter-spacing: 0.06em; opacity: 0.75; cursor: pointer; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
+  #tools button[aria-pressed="true"] { opacity: 1; color: var(--gold); }
+  /* The one instruction: a mouse with its wheel turning, for the first three seconds. */
+  #hint { position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%); display: grid; justify-items: center; gap: 10px; opacity: 0; transition: opacity 0.8s; pointer-events: none; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
+  #hint.on { opacity: 0.92; }
+  #hint .mouse { width: 22px; height: 34px; border: 1.5px solid var(--ink); border-radius: 12px; position: relative; }
+  #hint .mouse::after { content: ""; position: absolute; left: 50%; top: 7px; width: 2px; height: 6px; margin-left: -1px; background: var(--ink); animation: wheel 1.4s infinite; }
+  @keyframes wheel { 0% { transform: translateY(0); opacity: 1; } 70% { transform: translateY(9px); opacity: 0; } 100% { opacity: 0; } }
+  #fault { position: absolute; inset: 0; display: none; place-content: center; text-align: center; gap: 12px; background: var(--ground); }
+  #fault.on { display: grid; }
+  #debug { position: absolute; left: 10px; top: 10px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre; display: none; background: rgba(0, 0, 0, 0.55); padding: 6px 8px; }
+  #marks { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
+
+  body { background: #141611; }
+  #stage { width: min(100vw, 177.77778dvh); height: auto; aspect-ratio: 16/9;
+    inset: 50% auto auto 50%; transform: translate(-50%, -50%); overflow: hidden; }
+  #credit { position: fixed; z-index: 3; left: 14px; bottom: 12px; font-size: 12px; }
+  #credit summary { cursor: pointer; color: #eee9de; text-shadow: 0 1px 4px #171511; }
+  #credit[open] { padding: 12px; max-width: min(32em, 75vw); background: #23231eee; }
+  #credit p { margin: 8px 0 0; line-height: 1.55; } #credit a { color: inherit; }
+</style>
+<div id="stage">
+  <canvas id="film" tabindex="0" aria-label="Machu Picchu"></canvas>
+  <svg id="marks"></svg>
+</div>
+<div id="load"><i></i></div>
+<aside id="place"><strong></strong><div id="line"><span id="bar"></span></div></aside>
+<div id="tools"><button id="auto" type="button" aria-pressed="false"></button></div>
+<div id="hint" aria-hidden="true"><span class="mouse"></span><span id="hintText"></span></div>
+<div id="fault" role="alert"><p id="faultText"></p><button id="again" type="button"></button></div>
+<details id="credit"><summary>署名 / Credits</summary>
+  <p><a href="https://commons.wikimedia.org/wiki/File:80_-_Machu_Picchu_-_Juin_2009_-_edit.2.jpg">Martin St-Amant, Wikipedia</a>,
+  <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a> (adapted mountain and city relief).</p>
+  <p><a href="https://www.flickr.com/photos/beggs/49472067753/">Brian Jeffery Beggerly</a> (valley composite),
+  <a href="https://www.flickr.com/photos/mckaysavage/7183500885/">McKay Savage</a> (gate texture),
+  <a href="https://creativecommons.org/licenses/by/2.0/">CC BY 2.0</a>.</p>
+  <p>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>,
+  <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles</a>,
+  <a href="https://polyhaven.com/">Poly Haven, CC0</a>.</p></details>
+<pre id="debug"></pre>
+<script type="module">
+  // A plain page round the player: scroll to walk, dots for the stops, one word to let it walk on its own.
+  // Address options: ?film=<folder with film.json> (default: film), ?debug (frame rate, and a box round every clickable thing).
+  // The page tells its host what happens through events on window: "walkstop" { index, stop } when the place changes,
+  // "walkspot" { id, index } when a clickable thing is clicked, "walkframe" with the player's state on every refresh.
+  import { createFilm, filmSupported } from "./film.mjs";
+
+  const query = new URLSearchParams(location.search);
+  const base = (query.get("film") || "film").replace(/\/$/, "");
+  const debug = query.has("debug");
+  const zh = (query.get("lang") || navigator.language || "").toLowerCase().startsWith("zh");
+  const $ = (id) => document.getElementById(id);
+  const canvas = $("film"), place = $("place"), line = $("line"), bar = $("bar"), hint = $("hint");
+  document.documentElement.lang = zh ? "zh" : "en";
+  $("auto").textContent = zh ? "自动" : "Auto";
+  $("auto").title = zh ? "自动游览" : "Walk on its own";
+  $("hintText").textContent = zh ? "向下滚动" : "Scroll down";
+  $("faultText").textContent = zh ? "这段风景暂时无法呈现。" : "This walk is unavailable right now.";
+  $("again").textContent = zh ? "重试" : "Try again";
+
+  let player = null, data = null, stop = -1, placeTimer = 0, hintTimer = 0, hintDone = false, barAt = 0, count = 0, countAt = performance.now(), gaps = 0;
+  const showPlace = (hold = 3000) => {
+    place.classList.add("on");
+    clearTimeout(placeTimer);
+    placeTimer = setTimeout(() => { if (place.matches(":hover")) showPlace(); else place.classList.remove("on"); }, hold);
+  };
+  const hideHint = () => { if (!hintDone) { hintDone = true; clearTimeout(hintTimer); hint.classList.remove("on"); } };
+  const fault = (e) => { console.error("The walk stopped", e); $("fault").classList.add("on"); $("load").classList.add("off"); };
+
+  function onFrame(state) {
+    if (state.stop !== stop) {
+      stop = state.stop;
+      const s = data.stops[stop];
+      place.querySelector("strong").textContent = s ? s.name[zh ? 1 : 0] : "";
+      [...line.querySelectorAll("button")].forEach((b, k) => b.classList.toggle("on", k === stop));
+      showPlace();
+      dispatchEvent(new CustomEvent("walkstop", { detail: { index: stop, stop: s } }));
+    }
+    $("auto").setAttribute("aria-pressed", String(state.auto));
+    const now = performance.now();
+    if (now - barAt > 100) { barAt = now; bar.style.width = state.progress * 100 + "%"; }
+    dispatchEvent(new CustomEvent("walkframe", { detail: state }));
+    if (debug) {
+      count++;
+      if (now - countAt > 500) {
+        $("debug").textContent = `${Math.round((count * 1000) / (now - countAt))} fps  frame ${state.frame}  ${state.width}x${state.height}  gaps ${gaps}  spots ${state.spots.map((s) => s.id).join(" ")}`;
+        count = 0; countAt = now;
+      }
+      $("marks").innerHTML = state.spots.map((s) => `<polygon points="${s.q.map((p) => `${p.x},${p.y}`).join(" ")}" fill="none" stroke="#4dff7a" stroke-width="2"/>`).join("");
+    }
+  }
+
+  async function start() {
+    $("fault").classList.remove("on"); $("load").classList.remove("off");
+    player?.dispose();
+    try {
+      if (!filmSupported()) throw new Error("This browser cannot play the film");
+      const response = await fetch(`${base}/film.json`);
+      if (!response.ok) throw new Error(`film.json: ${response.status}`);
+      data = await response.json();
+      line.querySelectorAll("button").forEach((b) => b.remove());
+      data.stops.forEach((s) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.title = s.name[zh ? 1 : 0]; b.setAttribute("aria-label", b.title);
+        b.style.left = (s.frame / data.count) * 100 + "%";
+        b.addEventListener("click", (e) => { e.stopPropagation(); hideHint(); player?.go(s.t); });
+        line.append(b);
+      });
+      const slow = navigator.connection?.saveData || ["slow-2g", "2g", "3g"].includes(navigator.connection?.effectiveType);
+      player = await createFilm(canvas, {
+        base, data, mbps: slow ? 2 : undefined, quality: Number(query.get("width")) || (data.video.some(v => v.width === 1920) ? 1920 : 0), start: Number(query.get("t")) || 0,
+        progress: (share) => { $("load").firstElementChild.style.width = share * 100 + "%"; },
+        ready: () => { $("load").classList.add("off"); if (!hintDone) { hint.classList.add("on"); hintTimer = setTimeout(hideHint, 3000); } },
+        error: fault,
+        frame: onFrame,
+      });
+      window.walk = player;   // for the host page, and for checking the page from outside
+    } catch (e) { fault(e); }
+  }
+
+  const push = (seconds, most) => { if (player) { hideHint(); player.push(seconds, most); } };
+  addEventListener("wheel", (e) => { e.preventDefault(); push(e.deltaY * (e.deltaMode === 1 ? 16 : 1) * 0.0042); }, { passive: false });
+  let touchY = null;
+  addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; showPlace(); }, { passive: true });
+  addEventListener("touchmove", (e) => { if (touchY === null) return; const y = e.touches[0].clientY; push((touchY - y) * 0.02); touchY = y; }, { passive: true });
+  addEventListener("keydown", (e) => {
+    if (e.isComposing || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (["ArrowDown", "ArrowRight", "PageDown"].includes(e.key)) { push(1, 1.5); e.preventDefault(); }
+    if (["ArrowUp", "ArrowLeft", "PageUp"].includes(e.key)) { push(-1, 1.5); e.preventDefault(); }
+    if (e.key === " ") { hideHint(); player?.setAuto($("auto").getAttribute("aria-pressed") !== "true"); e.preventDefault(); }
+  });
+  let movedAt = 0;
+  addEventListener("mousemove", (e) => {
+    canvas.classList.toggle("can", e.target === canvas && !!player?.hit(e.clientX, e.clientY));
+    if (performance.now() - movedAt > 400 && Math.abs(e.movementX) + Math.abs(e.movementY) > 1) { movedAt = performance.now(); showPlace(); }
+  });
+  canvas.addEventListener("click", (e) => {
+    const found = player?.hit(e.clientX, e.clientY);
+    if (found) dispatchEvent(new CustomEvent("walkspot", { detail: { id: found.id, index: found.index } }));
+  });
+  line.addEventListener("click", (e) => { const r = line.getBoundingClientRect(); hideHint(); player?.go(((e.clientX - r.left) / r.width) * player.duration); });
+  $("auto").addEventListener("click", () => { hideHint(); player?.setAuto($("auto").getAttribute("aria-pressed") !== "true"); });
+  $("again").addEventListener("click", start);
+  canvas.addEventListener("filmgap", () => { gaps++; });
+  if (debug) { $("debug").style.display = "block"; $("marks").style.display = "block"; addEventListener("walkspot", (e) => console.log("spot", e.detail.id)); }
+  start();
+</script>
+</html>

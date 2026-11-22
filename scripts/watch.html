@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{name}}</title>
+<style>
+  html { background: #f3f2ef; }
+  body { margin: 0; padding: 24px 16px 64px; color: #1d1d1b; font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-size: 18px; font-weight: 600; margin: 40px 0 12px; padding-top: 12px; border-top: 1px solid #c9c7c1; }
+  h3 { font-size: 15px; font-weight: 600; margin: 20px 0 6px; }
+  p, ul, table { margin: 0 0 10px; }
+  ul { padding-left: 20px; }
+  a { color: #a86c3f; }
+  a:visited { color: #a86c3f; }
+  .busy { color: #d5a886; font-weight: 600; }
+  .busy::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 6px; background: #d5a886; animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .muted { color: #6b6a66; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-bottom: 20px; }
+  img { display: block; width: 100%; height: auto; background: #e6e4df; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid #d9d7d1; vertical-align: top; }
+  th { font-weight: 600; }
+  pre { margin: 0 0 10px; white-space: pre-wrap; font: 13px/1.5 ui-monospace, Consolas, monospace; }
+  .error { color: #8a2a1c; white-space: pre-wrap; }
+  [hidden] { display: none !important; }
+</style>
+<main>
+  <h1 id="name">{{name}}</h1>
+  <div class="meta">
+    <span id="file" class="muted"></span>
+    <span id="saved" class="muted"></span>
+    <span id="last" class="muted"></span>
+    <span id="busy" class="busy" hidden></span>
+    <a id="pick" href="/pick" target="_blank" rel="noopener">Pick a point</a>
+  </div>
+  <p id="error" class="error" hidden></p>
+
+  <h2>Four views</h2>
+  <p id="sheet-note" class="muted">Waiting for the first render.</p>
+  <img id="sheet" alt="Four clay views of the model" hidden>
+
+  <h2>Cameras</h2>
+  <p id="views-note" class="muted">No numbered cameras rendered yet.</p>
+  <div id="views"></div>
+
+  <h2>Steps</h2>
+  <p class="muted">Scripts in the build folder, in order.</p>
+  <ul id="build"></ul>
+  <p class="muted">What each step did to the model.</p>
+  <pre id="steps"></pre>
+
+  <h2>Sources</h2>
+  <div id="sources"></div>
+
+  <h2>Outputs</h2>
+  <p id="summary"></p>
+  <table>
+    <thead><tr><th>Camera</th><th>File</th><th>State</th></tr></thead>
+    <tbody id="outputs"></tbody>
+  </table>
+</main>
+<script>
+(() => {
+  const el = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const STATE = {current: "up to date", stale: "older than the model", missing: "not made yet"};
+  function inline(text) {
+    let t = esc(text);
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+    t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    t = t.replace(/(^|[^"=>])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+    return t;
+  }
+  function sources(text) {
+    const out = [];
+    let list = null;
+    for (const raw of (text || "").split(/\r?\n/)) {
+      const line = raw.trim();
+      const item = line.match(/^[-*]\s+(.*)$/);
+      if (item) { if (!list) { list = []; out.push(list); } list.push(item[1]); continue; }
+      list = null;
+      if (!line) continue;
+      const head = line.match(/^#+\s+(.*)$/);
+      out.push(head ? {head: head[1]} : {para: line});
+    }
+    return out.map(b => Array.isArray(b) ? "<ul>" + b.map(i => "<li>" + inline(i) + "</li>").join("") + "</ul>"
+                      : b.head ? "<h3>" + inline(b.head) + "</h3>" : "<p>" + inline(b.para) + "</p>").join("");
+  }
+  function setImage(img, url) {
+    if (!url) { img.hidden = true; return; }
+    if (img.getAttribute("src") !== url) img.src = url;
+    img.hidden = false;
+  }
+  function render(s) {
+    document.title = s.name;
+    el("name").textContent = s.name;
+    el("file").textContent = s.file;
+    el("saved").textContent = s.saved ? "Model saved " + s.saved : "";
+    el("last").textContent = s.last_render ? "Last render " + s.last_render : "";
+    el("busy").hidden = !s.rendering;
+    el("busy").textContent = s.rendering ? "Rendering " + s.rendering + "…" : "";
+    el("error").hidden = !s.error; el("error").textContent = s.error || "";
+    setImage(el("sheet"), s.sheet);
+    el("sheet-note").hidden = !!s.sheet;
+    const views = el("views");
+    const keep = new Set();
+    for (const v of s.views || []) {
+      const key = "view-" + v.name;
+      keep.add(key);
+      let block = document.getElementById(key);
+      if (!block) {
+        block = document.createElement("div"); block.id = key;
+        block.innerHTML = "<h3></h3><img alt=\"\">";
+        views.appendChild(block);
+      }
+      block.querySelector("h3").textContent = v.name;
+      block.querySelector("img").alt = v.name;
+      setImage(block.querySelector("img"), v.url);
+    }
+    for (const block of [...views.children]) if (!keep.has(block.id)) block.remove();
+    el("views-note").hidden = (s.views || []).length > 0;
+    el("build").innerHTML = (s.build || []).map(n => "<li>" + esc(n) + "</li>").join("");
+    el("steps").textContent = (s.steps || []).join("\n") || "No steps recorded in the model yet.";
+    const src = sources(s.sources);
+    if (el("sources").dataset.raw !== s.sources) { el("sources").innerHTML = src || "<p class=\"muted\">No sources.md in this folder.</p>"; el("sources").dataset.raw = s.sources; }
+    el("summary").textContent = s.summary || "";
+    el("outputs").innerHTML = (s.outputs || []).map(o =>
+      "<tr><td>" + esc(o.camera) + "</td><td>" + esc(o.file) + "</td><td>" + esc(STATE[o.state] || o.state) + "</td></tr>").join("")
+      || "<tr><td colspan=\"3\" class=\"muted\">Nothing to list yet.</td></tr>";
+  }
+  async function poll() {
+    try { render(await (await fetch("/state.json", {cache: "no-store"})).json()); }
+    catch (e) { el("error").hidden = false; el("error").textContent = "Lost contact with the watcher. Is it still running?"; }
+    setTimeout(poll, 3000);
+  }
+  poll();
+})();
+</script>
+</html>

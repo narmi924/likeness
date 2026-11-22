@@ -1,0 +1,11 @@
+{
+  "fps": 30, "eye": 1.62, "speed": 1.4, "lens": 28,
+  "ground": ["Terrain"],
+  "line": [[-34, -9], [-20, -4], [-8, 1], [4, 3], [16, 7]],
+  "keys": [
+    {"at": 0, "look": 8, "pitch": 2, "name": ["Start", "起点"]},
+    {"near": [-8, 1], "look": -14, "pitch": 2},
+    {"near": [16, 7], "target": [20, 8, 1.8], "pitch": 3, "lens": 26, "stop": "rocks", "name": ["Rocks", "石头"]}
+  ],
+  "must_see": {"rocks": ["Rocks.000"]}
+}

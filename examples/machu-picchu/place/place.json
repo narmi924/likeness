@@ -1,0 +1,45 @@
+{
+  "name": "Machu Picchu",
+  "lat": -13.1645,
+  "lon": -72.5456,
+  "size": 3400.0,
+  "cell": 3.4,
+  "samples": 1001,
+  "centre_height": 2443.17,
+  "lowest": 1774.43,
+  "highest": 3013.03,
+  "elevation": {
+    "source": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+    "zoom": 15,
+    "tiles": 16,
+    "metres_per_tile_pixel": 4.65
+  },
+  "outlines": {
+    "source": "https://overpass-api.de/api/interpreter",
+    "counts": {
+      "point": 146,
+      "path": 116,
+      "road": 26,
+      "area": 89,
+      "rail": 27,
+      "building": 218,
+      "water": 8,
+      "line": 20,
+      "wall": 201,
+      "cliff": 19
+    }
+  },
+  "map": {
+    "px": 2000,
+    "margin": 80,
+    "pixels_per_metre": 0.5882352941176471,
+    "centre": [
+      0.0,
+      0.0
+    ],
+    "half": 1700.0,
+    "grid": 250.0,
+    "contours": 50
+  },
+  "frame": "metres, x east, y north, origin at lat/lon; heights above sea level"
+}

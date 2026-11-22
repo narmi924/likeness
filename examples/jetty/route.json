@@ -1,0 +1,11 @@
+{
+  "fps": 24, "eye": 1.62, "lens": 28, "seconds": 6,
+  "ground": ["Terrain"],
+  "line": [[-11.4, -3.0], [-8.8, -2.6], [-5.4, -2.1], [-3.2, -1.4], [-2.1, -0.85]],
+  "keys": [
+    {"at": 0, "look": 12, "pitch": 1.0},
+    {"near": [-5.4, -2.1], "look": 20, "pitch": 0.5},
+    {"near": [-2.1, -0.85], "target": [1.9, 8.2, 0.5], "pitch": -2.5, "lens": 26, "stop": "jetty", "name": ["Jetty", "栈桥"]}
+  ],
+  "must_see": {"jetty": ["Jetty", "Boat", "Far shore"]}
+}

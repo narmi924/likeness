@@ -1,0 +1,31 @@
+{
+  "fps": 60,
+  "seconds": 24,
+  "loop": false,
+  "eye": 1.62,
+  "speed": 1.45,
+  "lens": 25,
+  "sensor": 36,
+  "ground": ["Walk surface"],
+  "line": [
+    [68.18, -51.39],
+    [62.52, -46.65],
+    [60.72, -41.50],
+    [60.65, -36.80],
+    [61.00, -33.10],
+    [60.48, -27.51],
+    [60.44, -21.25]
+  ],
+  "keys": [
+    {"at": 0, "target": [77, 104, 0], "pitch": -2, "lens": 23, "stop": "terraces", "name": ["Agricultural terraces", "梯田边缘"]},
+    {"near": [61.00, -33.10], "target": [60.48, -27.51, 12.5], "pitch": 0, "shift": 0.155, "lens": 24, "stop": "city-gate", "name": ["City gate", "古城正门"], "hold": 0.6},
+    {"near": [60.48, -27.51], "target": [57.35, 7.70, 12], "pitch": -1.0, "lens": 24},
+    {"near": [60.44, -21.25], "target": [54.55, 7.70, 12], "pitch": -0.6, "lens": 24, "stop": "urban-path", "name": ["Inside the city", "门内石道"], "hold": 0.6}
+  ],
+  "legs": [14.4, 8.4],
+  "must_see": {
+    "terraces": ["Agricultural terrace fronts", "Urban ensemble", "Huayna Picchu"],
+    "city-gate": ["City gate lintel", "City gate jambs", "Huayna Picchu"],
+    "urban-path": ["Urban passage walls", "Urban paving", "Huayna Picchu"]
+  }
+}

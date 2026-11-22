@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blender model view</title>
+<style>
+  :root { color-scheme: light dark; font: 14px system-ui, sans-serif; }
+  body { margin: 0; color: CanvasText; background: Canvas; }
+  main { max-width: 1120px; margin: auto; }
+  header, footer { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; padding: .7rem .9rem; }
+  header strong { margin-right: auto; }
+  select, button { font: inherit; color: inherit; background: Canvas; border: 1px solid GrayText;
+                   border-radius: .4rem; padding: .3rem .45rem; }
+  button, select { cursor: pointer; }
+  button:disabled, select:disabled { cursor: wait; }
+  figure { position: relative; margin: 0; background: #30333a; }
+  #view { display: block; width: 100%; height: auto; cursor: crosshair; }
+  #highlight { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #marker { position: absolute; width: .8rem; height: .8rem; border: 2px solid white; box-shadow: 0 0 0 2px #242933;
+            border-radius: 50%; transform: translate(-50%,-50%); pointer-events: none; }
+  #status { flex: 1; min-width: 10rem; overflow-wrap: anywhere; }
+  #objects { max-width: 18rem; }
+  [hidden] { display: none !important; }
+</style>
+<main>
+  <header>
+    <strong id="scene">Blender</strong>
+    <span id="controls" hidden>
+      <select id="angle" aria-label="View angle">
+        <option value="camera">Scene camera</option><option value="three-quarter">Three-quarter</option>
+        <option value="front">Front</option><option value="right">Right</option>
+        <option value="back">Back</option><option value="left">Left</option><option value="top">Top</option>
+      </select>
+      <select id="style" aria-label="Shading"><option value="clay">Clay</option><option value="render">Rendered</option><option value="wire">Wireframe</option><option value="normals">Normals</option></select>
+      <button id="refresh" type="button">Refresh</button>
+    </span>
+  </header>
+  <figure><img id="view" alt="Blender camera view" hidden><canvas id="highlight" hidden></canvas><span id="marker" hidden></span></figure>
+  <footer>
+    <span id="status" role="status" aria-live="polite">Loading view…</span>
+    <select id="objects" aria-label="Select a visible object" hidden></select>
+    <button id="copy" type="button" hidden>Copy reference</button>
+    <button id="clear" type="button" hidden>Clear</button>
+  </footer>
+</main>
+<!-- local capture -->
+<script>
+// The MCP Apps handshake and selection attachment adapt mcp-for-blender's MIT viewport.
+(() => {
+  const el = id => document.getElementById(id);
+  const local = el("capture");
+  const canvas = document.createElement("canvas");
+  const pixels = canvas.getContext("2d", {willReadFrequently: true, colorSpace: "srgb"});
+  const pending = new Map();
+  let sequence = 0, revision = 0, current, photo, selected, canAttach = false;
+  let objectIds, namedCamera;
+  let selectionQueue = Promise.resolve();
+  const post = body => window.parent.postMessage({jsonrpc: "2.0", ...body}, "*");
+  function request(method, params) {
+    const id = ++sequence;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { pending.delete(id); reject(Error(method + " timed out")); }, 280000);
+      pending.set(id, {resolve, reject, timer});
+      post({id, method, params});
+    });
+  }
+  function showError(error) { el("status").textContent = error.message || String(error); }
+  function outline(key) {
+    const layer = el("highlight");
+    if (!key) { layer.hidden = true; return; }
+    layer.hidden = false;
+    layer.width = canvas.width; layer.height = canvas.height;
+    const ctx = layer.getContext("2d"), overlay = ctx.createImageData(layer.width, layer.height);
+    const code = Number(key), w = layer.width;
+    for (let i=0; i<objectIds.length; i++) {
+      if (objectIds[i] !== code) continue;
+      const edge = i%w===0 || i%w===w-1 || objectIds[i-1]!==code || objectIds[i+1]!==code ||
+                   objectIds[i-w]!==code || objectIds[i+w]!==code;
+      const j=i*4;
+      overlay.data[j]=255; overlay.data[j+1]=189; overlay.data[j+2]=90; overlay.data[j+3]=edge?235:36;
+    }
+    ctx.putImageData(overlay,0,0);
+  }
+  async function display(image, view) {
+    if (!view || !image) return;
+    const id = ++revision;
+    const map = new Image();
+    map.src = "data:image/png;base64," + view.pickMap;
+    await map.decode();
+    if (id !== revision) return;
+    const keep = selected && current?.source === view.source && current.scene === view.scene &&
+                 view.input.source !== "live" && JSON.stringify(current.revision)===JSON.stringify(view.revision);
+    if (selected && !keep) { if (canAttach) queueSelection([]); selected=null; }
+    canvas.width = map.naturalWidth; canvas.height = map.naturalHeight;
+    pixels.drawImage(map, 0, 0);
+    const rgba=pixels.getImageData(0,0,canvas.width,canvas.height).data;
+    objectIds=new Uint32Array(canvas.width*canvas.height);
+    for (let i=0,j=0;i<objectIds.length;i++,j+=4)
+      objectIds[i]=rgba[j+3] ? (rgba[j]<<16 | rgba[j+1]<<8 | rgba[j+2]) : 0;
+    if (current?.source !== view.source || current?.scene !== view.scene) namedCamera = null;
+    if (view.angle === "camera") namedCamera = view.input.camera;
+    photo = image; current = view;
+    el("view").src = "data:image/png;base64," + image;
+    el("view").hidden = false;
+    el("scene").textContent = view.scene + " (frame " + view.frame + ")" + (view.angle === "camera" ? " · " + view.camera : "");
+    el("angle").value = view.angle; el("style").value = view.input.style;
+    el("marker").hidden = true;
+    el("copy").hidden = !selected || canAttach; el("clear").hidden = !selected;
+    const select = el("objects");
+    select.replaceChildren(new Option("Select object…", ""));
+    const entries = Object.entries(view.objects).sort((a,b) => a[1].name.localeCompare(b[1].name));
+    for (const [key, object] of entries) select.add(new Option(object.name, key));
+    select.hidden = entries.length === 0;
+    const match=selected && entries.find(([,obj])=>obj.name===selected.object.name && obj.library===selected.object.library);
+    if (match) select.value=match[0];
+    outline(match?.[0]);
+    el("status").textContent = selected ? selected.object.name + (match ? "" : " (outside this view)")
+        : (entries.length ? "Click a part or select its name." : "No pickable surface in this view.");
+  }
+  function applyResult(result) {
+    if (result.isError) throw Error(result.content?.[0]?.text || "Could not render this view.");
+    return display(result.content?.find(item => item.type === "image")?.data, result._meta?.modelView);
+  }
+  function queueSelection(content) {
+    selectionQueue = selectionQueue.then(() => request("ui/update-model-context", {content})).catch(showError);
+  }
+  function selectObject(key, point) {
+    const object = current?.objects[key];
+    if (!object) { el("status").textContent = "No object at this point."; return; }
+    selected = {source:current.source, input_source:current.input.source, revision:current.revision,
+                scene:current.scene, frame:current.frame, angle:current.angle, camera:current.camera,
+                subject:current.subject, object_key:String(key), object, point, capture_id:current.capture_id};
+    if (local) { selected.projection=current.projection; selected.dependencies=current.dependencies; }
+    el("objects").value = key;
+    outline(key);
+    el("clear").hidden = false;
+    el("copy").hidden = canAttach;
+    el("marker").hidden = !point;
+    if (point) {
+      el("marker").style.left = 100 * point[0] + "%";
+      el("marker").style.top = 100 * point[1] + "%";
+    }
+    el("status").textContent = object.name;
+    if (canAttach) queueSelection([
+      {type: "text", text: JSON.stringify(selected), _meta: {"openai/title": object.name}},
+      {type: "image", data: photo, mimeType: "image/png", _meta: {"openai/title": current.scene}},
+    ]);
+  }
+  el("view").onclick = event => {
+    if (!current) return;
+    const box = el("view").getBoundingClientRect();
+    const x = (event.clientX-box.left)/box.width, y = (event.clientY-box.top)/box.height;
+    const px=Math.min(canvas.width-1,Math.max(0,Math.floor(x*canvas.width)));
+    const py=Math.min(canvas.height-1,Math.max(0,Math.floor(y*canvas.height)));
+    selectObject(objectIds[py*canvas.width+px], [x,y]);
+  };
+  el("objects").onchange = event => { if (event.target.value) selectObject(event.target.value, null); };
+  el("copy").onclick = async () => {
+    if (!selected) return;
+    const text = JSON.stringify(selected);
+    try { await navigator.clipboard.writeText(text); el("status").textContent = "Copied " + selected.object.name; }
+    catch { el("status").textContent = text; }
+  };
+  el("clear").onclick = () => {
+    selected = null;
+    outline(null);
+    el("objects").value = "";
+    el("marker").hidden = el("clear").hidden = el("copy").hidden = true;
+    el("status").textContent = "Click a part or select its name.";
+    if (canAttach) queueSelection([]);
+  };
+  async function refresh(event) {
+    if (!current) return;
+    const controls = [el("angle"), el("style"), el("refresh")];
+    controls.forEach(c => c.disabled = true);
+    el("status").textContent = "Rendering view…";
+    try {
+      const args = {...current.input, angle: el("angle").value, style: el("style").value};
+      if (event.currentTarget === el("refresh")) args.fresh=true;
+      if (args.angle === "camera") {
+        args.subject = null;
+        if (namedCamera) args.camera = namedCamera;
+      } else {
+        delete args.camera;
+      }
+      await applyResult(await request("tools/call", {name: "show_model", arguments: args}));
+    } catch (error) {
+      el("angle").value = current.angle; el("style").value = current.input.style; showError(error);
+    } finally { controls.forEach(c => c.disabled = false); }
+  }
+  if (local) {
+    const data = JSON.parse(local.textContent);
+    display(data.image, data.view).catch(showError);
+    return;
+  }
+  el("refresh").onclick = el("angle").onchange = el("style").onchange = refresh;
+  window.addEventListener("message", event => {
+    const msg = event.data;
+    if (event.source !== window.parent || msg?.jsonrpc !== "2.0") return;
+    if (msg.id != null && !msg.method) {
+      const op = pending.get(msg.id);
+      if (!op) return;
+      pending.delete(msg.id); clearTimeout(op.timer);
+      msg.error ? op.reject(Error(msg.error.message)) : op.resolve(msg.result);
+    } else if (msg.method === "ui/notifications/tool-result") {
+      Promise.resolve().then(() => applyResult(msg.params)).catch(showError);
+    } else if (msg.method === "ui/resource-teardown") {
+      post({id: msg.id, result: {}});
+    } else if (msg.id != null) {
+      post({id: msg.id, error: {code: -32601, message: "Unsupported method"}});
+    }
+  });
+  request("ui/initialize", {protocolVersion:"2026-01-26", appInfo:{name:"likeness",version:"1.0.0"},
+                            appCapabilities:{}}).then(result => {
+    const caps = result.hostCapabilities || {};
+    canAttach = !!(caps.updateModelContext?.image || caps.experimental?.["openai/modelContext"]);
+    el("controls").hidden = false;
+    post({method:"ui/notifications/initialized"});
+    new ResizeObserver(() => post({method:"ui/notifications/size-changed",
+      params:{width:document.body.scrollWidth,height:document.body.scrollHeight}})).observe(document.body);
+  }).catch(showError);
+})();
+</script>
+</html>

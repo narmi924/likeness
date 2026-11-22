@@ -1,0 +1,2 @@
+- Elevation: Terrarium tiles, Mapzen and Tilezen on AWS Open Data (SRTM and others). https://registry.opendata.aws/terrain-tiles/
+- Outlines: © OpenStreetMap contributors, ODbL. https://www.openstreetmap.org/copyright

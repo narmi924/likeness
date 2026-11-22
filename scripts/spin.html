@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<style>
+  :root{color-scheme:dark;font:15px system-ui,sans-serif;background:#15171c;color:#f2f2f3}
+  *{box-sizing:border-box} body{margin:0} main{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+  header,footer{display:flex;align-items:center;gap:1rem;padding:.8rem clamp(.8rem,3vw,2.5rem)}
+  h1{font-size:1rem;font-weight:600;margin:0;flex:1} a{color:inherit;text-underline-offset:3px}
+  #stage{position:relative;min-height:0;overflow:hidden;background:#252831;touch-action:none;cursor:grab}
+  #stage:active{cursor:grabbing}video{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
+  #stage.flipped video{transform:rotate(180deg)}
+  footer{flex-wrap:wrap} input{flex:1;min-width:7rem;accent-color:#d5a886}
+  button{font:inherit;color:inherit;background:#252830;border:1px solid #555966;border-radius:.35rem;padding:.35rem .7rem;cursor:pointer}
+  output{min-width:3.4rem;font-variant-numeric:tabular-nums;text-align:right}#hint{font-size:.88rem;color:#bec1cc}
+  :focus-visible{outline:2px solid #f4bb91;outline-offset:3px}
+</style>
+<main>
+  <header><h1>{{title}}</h1><span id="hint">Drag to rotate</span>{{model}}</header>
+  <div id="stage" tabindex="0" role="group" aria-label="Drag horizontally or use the arrow keys to rotate">
+    <video id="movie" src="{{movie}}" {{poster}} muted loop playsinline preload="auto"></video>
+  </div>
+  <footer><button id="play" type="button">Play</button><input id="seek" type="range" min="0" max="1000" value="0" aria-label="Turntable position">
+    <output id="angle">0°</output><button id="flip" type="button" aria-pressed="false">Roll 180°</button></footer>
+</main>
+<script>
+(() => {
+  const get=id=>document.getElementById(id);
+  const movie=get("movie"),stage=get("stage"),seek=get("seek"),play=get("play");
+  const zh=navigator.language.toLowerCase().startsWith("zh");
+  if(zh){document.documentElement.lang="zh";get("hint").textContent="拖动旋转";get("flip").textContent="翻转 180°";
+    const link=document.querySelector("header a");if(link)link.textContent="Blender 工程";}
+  const wrap=n=>((n%1)+1)%1;
+  const pos=()=>movie.duration ? movie.currentTime/movie.duration : 0;
+  let drag, pending, tick;
+  function sync(){
+    if(!drag && !Number.isFinite(pending))seek.value=Math.round(pos()*1000);
+    get("angle").value=Math.round(Number(seek.value)*.36)+"°";
+    play.textContent=movie.paused?(zh?"播放":"Play"):(zh?"暂停":"Pause");
+  }
+  function renderSeek(){
+    tick=null;
+    if(!Number.isFinite(pending)||!movie.duration)return;
+    movie.currentTime=Math.min(pending*movie.duration,Math.max(0,movie.duration-.002));
+    pending=null;
+  }
+  function setPos(value){
+    movie.pause();pending=value;seek.value=Math.round(value*1000);sync();
+    if(tick==null)tick=requestAnimationFrame(renderSeek);
+  }
+  async function toggle(){if(movie.paused){try{await movie.play();}catch{get("hint").textContent=zh?"无法播放此影片":"Movie could not be played";}}else movie.pause();}
+  play.onclick=toggle;
+  seek.oninput=()=>setPos(Number(seek.value)/1000);
+  get("flip").onclick=event=>event.currentTarget.setAttribute("aria-pressed",String(stage.classList.toggle("flipped")));
+  stage.onpointerdown=e=>{if(e.button!==0)return;movie.pause();drag={x:e.clientX,p:pos()};stage.setPointerCapture(e.pointerId);};
+  stage.onpointermove=e=>{if(drag)setPos(wrap(drag.p+(e.clientX-drag.x)/Math.max(160,stage.clientWidth)));};
+  stage.onpointerup=stage.onpointercancel=()=>{drag=null;};
+  stage.onkeydown=e=>{
+    if(e.key==="ArrowLeft"||e.key==="ArrowRight"){e.preventDefault();setPos(wrap(Number(seek.value)/1000+(e.key==="ArrowRight"?1:-1)/72));}
+    if(e.key===" "){e.preventDefault();toggle();}
+  };
+  movie.addEventListener("loadedmetadata",()=>{if(Number.isFinite(pending))renderSeek();sync();});
+  for(const event of ["timeupdate","seeked","play","pause"])movie.addEventListener(event,sync);
+  movie.addEventListener("error",()=>{get("hint").textContent=zh?"请将影片与网页放在同一文件夹":"Keep the MP4 beside this viewer";});
+  sync();
+})();
+</script>
+</html>

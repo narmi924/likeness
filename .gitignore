@@ -1,0 +1,13 @@
+# this machine only
+local.json
+references/taste.md
+
+__pycache__/
+*.pyc
+
+# my site's film and its promo: kept on this machine
+examples/lakeside/
+examples/promo/
+
+tmp/
+docs/film/
