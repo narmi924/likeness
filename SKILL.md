@@ -1,11 +1,11 @@
 ---
 name: likeness
-description: 用 Blender 把真实的地方、建筑、产品和物件照着照片、地图和高程做成 3D，并一路做到能直接用的成品：单张图、转台、走进去的片子、网页里滚动就能往前走的片子、能放进网页的模型。先定成品给人怎么看，再围着镜头去建，每一轮都渲染出来看图再改。用户说“做个 3D 场景”“把这个地方/这栋楼/这个产品建出来”“给网站做 3D”“做一段漫游”“渲染”“Blender”时使用。Use for 3D modelling and scenes in Blender, replicas of real places, buildings and products from photographs, walk-through films, scroll-driven 3D for websites, turntables, renders, GLB export, and planning local or cloud rendering.
+description: 用 Blender 做出任何 3D 场景、建筑、产品和物件，真实存在的照着照片、地图和高程做，并一路做到能直接用的成品：单张图、转台、走进去的片子、网页里滚动就能往前走的片子、能放进网页的模型。先定成品给人怎么看，再围着镜头去建，每一轮都渲染出来看图再改。用户说“做个 3D 场景”“把这个地方/这栋楼/这个产品建出来”“给网站做 3D”“做一段漫游”“渲染”“Blender”时使用。Use for any 3D modelling and scenes in Blender, invented or real, replicas of real places, buildings and products from photographs, walk-through films, scroll-driven 3D for websites, turntables, renders, GLB export, and planning local or cloud rendering.
 ---
 
 # Likeness
 
-把一个真实的地方或一件东西做成 3D，像到一眼认得出，一直做到别人能直接看、直接用。方法来自一次真实的工作：一个网站首页，访客滚动鼠标绕湖走一圈，114 秒、6840 帧、2560×1440、每秒 60 帧，经过四个真实的地方。做法和踩过的坑都在这里。
+在 Blender 里做出任何 3D 场景，真实存在的东西做到一眼认得出，一直做到别人能直接看、直接用。方法来自一次真实的工作：一个网站首页，访客滚动鼠标绕湖走一圈，114 秒、6840 帧、2560×1440、每秒 60 帧，经过四个真实的地方。做法和踩过的坑都在这里。
 
 所有命令都通过一个入口运行，在任何文件夹里都能用：
 

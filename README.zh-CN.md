@@ -1,8 +1,12 @@
-[English](README.md) | [简体中文](README.zh-CN.md)
+<p align="center"><img src="media/icon.png" width="128" alt=""></p>
 
-# Likeness
+<h1 align="center">Likeness</h1>
 
-给 Claude Code 和 Codex 用的技能：照着照片、地图轮廓和高程，用 Blender 把一个真实的地方或一件东西做成 3D，并一直做到能直接用的成品：单张图、转台、走进去的片子、滚动就能往前走的网页，或者 GLB 模型。
+<p align="center">让 agent 在 Blender 里做出任何 3D 场景，并一直做到别人能直接用的成品：单张图、转台、走进去的片子、滚动就能往前走的网页，或者 GLB 模型。真实存在的地方和东西，会照着照片、地图和高程来做。</p>
+
+<p align="center">给 Claude Code 和 Codex 用的技能</p>
+
+<p align="center"><a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a></p>
 
 [![先在真实地图上画好路线，再在网页里从梯田走进马丘比丘古城正门](media/demo.webp)](media/demo.mp4)
 
@@ -14,7 +18,7 @@
 
 Likeness 留下了那次的做法和工具，让智能体能从一段需求一路做到成品。动手之前我能用上的工具，和它们留给我自己做的部分：
 
-| 现有工具 | 做得好的地方 | 做一个真实的地方还差什么 |
+| 现有工具 | 做得好的地方 | 还差什么 |
 |---|---|---|
 | [MCP for Blender](https://github.com/ahujasid/mcp-for-blender)（3.5 万星） | 智能体在 Blender 里跑 Python，看视口和渲染图，导入 Poly Haven 和 Sketchfab 素材 | 不能导入地图和高程，没有镜头方案，不出最终渲染、片子和网页 |
 | [arjun988/blender-skills](https://github.com/arjun988/blender-skills)、[EL4CTEO/blender-skills](https://github.com/EL4CTEO/blender-skills)（4600 星、2600 星） | 大量建模技能，对照参考照片建模，用高度图做地形，转台，导出网页用的 GLB | 没有真实高程和 OpenStreetMap 数据，开建前不等确认，不出片子和网页 |
@@ -23,7 +27,7 @@ Likeness 留下了那次的做法和工具，让智能体能从一段需求一�
 | [scroll-world](https://github.com/oso95/scroll-world)（1.1 万星）、[ScrollyVideo.js](https://github.com/dkaoster/scrolly-video)（1100 星） | 滚动就能拖动片子的网页 | 片子来自 AI 视频或者你自己；没有 3D 场景可以改了再渲 |
 | [Google Earth Studio](https://www.google.com/earth/studio/) | 在谷歌的 3D 影像上飞镜头 | 地方本身改不了，画面上要一直留着谷歌的标注，网页要自己做 |
 
-Likeness 把这些步骤围着一个照实测做的地方串起来。智能体先定成品给人怎么看，拉下地图和高程，找照片，把路线和每个镜头停靠点画在真实地图上。等你回复同意后再建场景，每改一处就渲染出来看，再请另一个智能体只看画面挑毛病，最后交付片子、网页和能继续改的 `.blend` 文件。
+Likeness 把这些步骤串起来。智能体先定成品给人怎么看，收集场景该长什么样的资料（真实的地方就拉下地图和高程、找照片），再画出路线和每个镜头停靠点。等你回复同意后再建场景，每改一处就渲染出来看，再请另一个智能体只看画面挑毛病，最后交付片子、网页和能继续改的 `.blend` 文件。
 
 ## 快速开始
 
@@ -56,6 +60,7 @@ python ~/.claude/skills/likeness/scripts/likeness.py setup --get
 
 ## 能做什么
 
+- **任何你说得出的场景。** 虚构的黄昏街道、桌上的产品、一个房间、一片风景。智能体先搭出大形，每改一处就渲染出来，看过画面再改下一处。
 - **真实的地方。** 智能体按经纬度拉下周围的高程和 OpenStreetMap 轮廓（`likeness place`），找照片，把方案画在这张地图上（`likeness plan`）：整个地方、路线细部，每个停靠点一张卡片，写着第几秒走到、要拍到什么。你回复之前它不动手建模。
 - **在里面走一段，放进网页。** 场景提前渲染成片子，网页随滚动前后播放，普通笔记本上每秒 60 帧。文字、可点的位置、雪和雨在网页里实时叠在画面上。
 - **周围的城镇和天气。** 按 OpenStreetMap 轮廓和标注的层高立起楼，有窗、窗帘，黄昏时一部分房间亮灯；地平线上的一片城；带雪线的山；朝上的面积雪，湿地面和水洼，墙上的雨痕；落了叶的树和挂雪的针叶。网页上的雪、雨和沙在片子上方实时落下，每一段路可以配自己的音乐。
