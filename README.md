@@ -10,11 +10,21 @@
 
 [![The plan on the real map, then the page walking from the terraces through the city gate of Machu Picchu](media/demo.webp)](media/demo.mp4)
 
-[Open the page](https://narmi924.github.io/likeness/) and scroll. GPT-6.2 Astra built it in Codex with this skill, starting from an empty folder; three rented RTX 4090s rendered the 1440 frames for 1.89 USD. The scripts are in [examples/machu-picchu](examples/machu-picchu).
+Machu Picchu, from the terraces through the city gate. GPT-6.2 Astra built it in Codex with this skill, starting from an empty folder: one session of 3 h 38 min and 59 million tokens, most of them cached context. Three rented RTX 4090s rendered the 1440 frames for 1.89 USD. [Open the page](https://narmi924.github.io/likeness/) and scroll; the scripts are in [examples/machu-picchu](examples/machu-picchu).
+
+## Made with Likeness
+
+| Machu Picchu | A walk round a lake |
+|---|---|
+| [![Machu Picchu: the terraces, the city gate and Huayna Picchu](media/works/machu-picchu.jpg)](https://narmi924.github.io/likeness/) | [![A snowy lake with a city and mountains behind it](media/works/lake-walk.jpg)](https://www.imranjan.cn) |
+| The terraces and the city gate, from photographs, OpenStreetMap and elevation. The page above. | The 3D home page of my site, [imranjan.cn](https://www.imranjan.cn): 114 seconds past four real places, scrolled at 60 fps on a laptop. |
+| **Cristiano Ronaldo** | **The World Cup trophy** |
+| ![A photograph of Cristiano Ronaldo beside the model](media/works/portrait.jpg) | ![The trophy in gold, whole and in close-up](media/works/trophy.jpg) |
+| A portrait fitted to photographs. Left, a [November 2025 photograph](https://commons.wikimedia.org/wiki/File:President_Donald_Trump_meets_with_Cristiano_Ronaldo_in_the_Oval_Office_(54933344262)_(cropped_and_rotated).jpg) (public domain); right, the model. | An object in gold with its two malachite bands, lit as a studio still. |
 
 ## Why
 
-The 3D home page of my site, [imranjan.cn](https://www.imranjan.cn), began as a real-time scene. On my laptop's integrated graphics it ran at 29 to 36 fps and looked flat. In November 2026 I rebuilt it as a film rendered ahead in Blender: a 114-second walk round a lake past four real places, 6840 frames at 2560×1440 and 60 fps. Eight rented GPUs rendered it in 2 h 05 min for 24.40 USD. Scrolling the page walks through the film at 60 fps on the same laptop.
+The 3D home page of my site began as a real-time scene. On my laptop's integrated graphics it ran at 29 to 36 fps and looked flat, so I rebuilt it as a film rendered ahead in Blender that the page plays as you scroll.
 
 Likeness keeps the method and the tools from that work, so an agent can take the next scene from a brief to a finished result. What I could use before, and what each still left to me:
 

@@ -10,11 +10,21 @@
 
 [![先在真实地图上画好路线，再在网页里从梯田走进马丘比丘古城正门](media/demo.webp)](media/demo.mp4)
 
-[打开这个网页](https://narmi924.github.io/likeness/)，往下滚就往前走。这是 GPT-6.2 Astra 在 Codex 里用这个技能从一个空文件夹做出来的；租了 3 台 RTX 4090 渲完 1440 帧，花了 1.89 美元。脚本在 [examples/machu-picchu](examples/machu-picchu)。
+马丘比丘，从梯田走进古城正门。这是 GPT-6.2 Astra 在 Codex 里用这个技能从一个空文件夹做出来的：一个会话，3 小时 38 分，5900 万 token，大部分是缓存的上下文；最后租了 3 台 RTX 4090 渲完 1440 帧，花了 1.89 美元。[打开这个网页](https://narmi924.github.io/likeness/)，往下滚就往前走；脚本在 [examples/machu-picchu](examples/machu-picchu)。
+
+## 用它做的作品
+
+| 马丘比丘 | 环湖漫游 |
+|---|---|
+| [![马丘比丘：梯田、古城正门和瓦伊纳比丘山](media/works/machu-picchu.jpg)](https://narmi924.github.io/likeness/) | [![雪后的湖，后面是城市和雪山](media/works/lake-walk.jpg)](https://www.imranjan.cn) |
+| 照着照片、OpenStreetMap 和高程做的梯田和古城正门，就是上面那个网页。 | 我的网站 [imranjan.cn](https://www.imranjan.cn) 的 3D 首页：114 秒，经过四个真实的地方，笔记本上滚动每秒 60 帧。 |
+| **C 罗** | **大力神杯** |
+| ![C 罗的照片和模型并排](media/works/portrait.jpg) | ![金色的奖杯，全身和近景](media/works/trophy.jpg) |
+| 照着照片做的肖像。左边是 [2025 年 11 月的照片](https://commons.wikimedia.org/wiki/File:President_Donald_Trump_meets_with_Cristiano_Ronaldo_in_the_Oval_Office_(54933344262)_(cropped_and_rotated).jpg)（公有领域），右边是模型。 | 一件物件：金色杯身和底座上的两圈孔雀石，按棚拍静物打光。 |
 
 ## 为什么做
 
-我的网站 [imranjan.cn](https://www.imranjan.cn) 的 3D 首页，最早是实时渲染的场景。在我这台核显笔记本上只有每秒 29 到 36 帧，画面也发平。2026 年 11 月我把它改成在 Blender 里提前渲染好的片子：沿湖走一圈，经过四个真实的地方，114 秒，6840 帧，2560×1440，每秒 60 帧。租了 8 台显卡机器，2 小时 5 分钟渲完，花了 24.40 美元。现在滚动页面就是在这条片子里走，同一台笔记本上每秒 60 帧。
+我的网站的 3D 首页，最早是实时渲染的场景。在我这台核显笔记本上只有每秒 29 到 36 帧，画面也发平，所以我把它改成在 Blender 里提前渲染好、滚动页面就能播放的片子。
 
 Likeness 留下了那次的做法和工具，让智能体能从一段需求一路做到成品。动手之前我能用上的工具，和它们留给我自己做的部分：
 
