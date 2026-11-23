@@ -22,6 +22,10 @@
 | ![C 罗的照片和模型并排](media/works/portrait.jpg) | ![金色的奖杯，全身和近景](media/works/trophy.jpg) |
 | 照着照片做的肖像。左边是 [2025 年 11 月的照片](https://commons.wikimedia.org/wiki/File:President_Donald_Trump_meets_with_Cristiano_Ronaldo_in_the_Oval_Office_(54933344262)_(cropped_and_rotated).jpg)（公有领域），右边是模型。 | 一件物件：金色杯身和底座上的两圈孔雀石，按棚拍静物打光。 |
 
+五个模型用 Likeness 拍同一个镜头，黄昏沿碎石路走到湖边停下，让木栈桥、系在桥边的小船和对岸的树林同时入画。
+
+![GPT-6.2 Astra、GPT-6.2 Sol、Claude Fable 5.2、Claude Opus 5.5 和 Claude Sonnet 5.5 各自拍出的湖岸停靠画面](media/works/lakeside-models.jpg)
+
 ## 为什么做
 
 我的网站的 3D 首页，最早是实时渲染的场景。在我这台核显笔记本上只有每秒 29 到 36 帧，画面也发平，所以我把它改成在 Blender 里提前渲染好、滚动页面就能播放的片子。

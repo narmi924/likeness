@@ -22,6 +22,10 @@ Machu Picchu, from the terraces through the city gate. GPT-6.2 Astra built it in
 | ![A photograph of Cristiano Ronaldo beside the model](media/works/portrait.jpg) | ![The trophy in gold, whole and in close-up](media/works/trophy.jpg) |
 | A portrait fitted to photographs. Left, a [November 2025 photograph](https://commons.wikimedia.org/wiki/File:President_Donald_Trump_meets_with_Cristiano_Ronaldo_in_the_Oval_Office_(54933344262)_(cropped_and_rotated).jpg) (public domain); right, the model. | An object in gold with its two malachite bands, lit as a studio still. |
 
+Five models used Likeness to film the same walk along a gravel path at dusk, stopping with a wooden jetty, the boat tied alongside and the woods across the lake in view.
+
+![The final lakeside shot by GPT-6.2 Astra, GPT-6.2 Sol, Claude Fable 5.2, Claude Opus 5.5 and Claude Sonnet 5.5](media/works/lakeside-models.jpg)
+
 ## Why
 
 The 3D home page of my site began as a real-time scene. On my laptop's integrated graphics it ran at 29 to 36 fps and looked flat, so I rebuilt it as a film rendered ahead in Blender that the page plays as you scroll.
