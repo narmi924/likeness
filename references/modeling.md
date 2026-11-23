@@ -41,6 +41,37 @@ python <skill>/scripts/sources.py fetch provider:id new-directory [--resolution 
 
 The `find_references` MCP tool searches selected catalogs together. Sketchfab and BlenderKit read `SKETCHFAB_TOKEN` and `BLENDERKIT_API_KEY`, or the corresponding `sketchfab_token` and `blenderkit_api_key` fields in the credential file selected by `BLENDER_STUDIO_ACCOUNTS`. This workspace can point at an existing credential file through its private runtime's `asset-accounts.path`. Results include the author, license and source URL. Inspect the actual downloaded geometry, textures, scale and rig before choosing it.
 
+## Fit a place or object to photographs
+
+The modeling agent finds the references, identifies corresponding corners, prepares any masks and runs the commands. Start with the pictures at hand. A single picture can establish the front elevation. Seek an overlapping side view when depth matters to the final camera.
+
+1. Size a blockout from a known dimension. On a clear photo, identify at least six widely spaced corners whose world coordinates you can read from the build script or pick with `likeness locate`. Include corners at different depths when available. Write the pairs in the project's scratch directory as a JSON array, with entries such as `{"name":"left jamb foot","world":[1.3,2.0,0.0],"pixel":[147,622]}`. Pixels use the original image size and start at the top left.
+2. Use the first command below to make the reference camera. Check its overlay and inspect the largest named pixel errors. The focal length comes from EXIF when available. Flat landmarks alone leave it ambiguous. Supply a known horizontal field of view with `--fov` when available. The camera background and its photo are saved in the blend.
+3. Match another overlapping photograph from that camera. Name the mesh surfaces that show the same physical details in both views. Repeated windows or masonry can give a plausible wrong match. Inspect the overlay across the entire subject, including the opening and the rear edges. For a photo with few shared details, choose another reference camera or identify its corners yourself.
+
+```text
+likeness match-photo blockout.blend front.jpg first.blend --anchors corners.json --name Front
+likeness match-photo first.blend side.jpg paired.blend --from-camera Front --surface "Gate jambs" --surface Lintel --name Side
+likeness compare paired.blend side.jpg overlay.png --angle camera --camera Side --overlay
+```
+
+These commands use OpenCV, NumPy and Pillow in the Python running Likeness. If OpenCV is missing, the agent can run this command with project-local packages, for example `uv run --no-project --with opencv-python-headless --with pillow python <skill>/scripts/likeness.py match-photo …`.
+
+To refine a doorway, fit the camera against the front stones. Read the rear edges of the opening from an oblique photo. In Blender, `fit.pixel_rays(scene, camera, pixels_by_name)` gives a world origin and direction for each marked pixel. Intersect these rays with the blockout's rear wall plane to place the inner corners while keeping the facade fixed. This uses the assumed wall depth. Compare the opening at several heights in a separate photo before accepting the change.
+
+To add observed color, run the following in a build script with `likeness edit`. Each texel uses the clearest visible view by projected resolution and surface angle. A scene ray checks occlusion. Supply a same-size grayscale mask to exclude people, background through openings, or distracting shadows. White allows paint. Black keeps that view out. Include only source photos for which lighting and surface detail agree. Use the optional material selection to preserve a good existing finish.
+
+```python
+import bpy
+from modeling import phototexture
+scene = bpy.context.scene
+phototexture.project(scene.objects["Gate jambs"], [scene.objects["Front"], scene.objects["Side"]],
+                     masks={"Side": ROOT / "references/side-mask.png"},
+                     materials={"Granite sides"}, size=1024)
+```
+
+The result is a packed color image on a separate UV map. Unobserved texels retain the underlying material. Check a photograph excluded from painting, especially the seam at the corner as the camera moves. If the colors shift between views, restrict the painted area or keep the original material. For a set with uncertain camera angles, an agent with access to the [Apache-licensed MapAnything weights](https://huggingface.co/facebook/map-anything-apache) can use its estimated lens and depth as starting points. Convert its cropped-image intrinsics back to the source frame before supplying a field of view. Check edge depths against adjacent stone or another photograph.
+
 ## People and creatures
 
 Choose topology for the next operation. Project Heist's sculpting base uses fairly even quads, few poles and real-world scale so Multires subdivisions and smoothing behave predictably. For a production rig, preserve useful loops around the mouth, eyes and joints, test the required pose and keep high-frequency sculpting on a compatible layer or a separate mesh. The downloadable Heist example and the CC0 bundle below have their own licenses. [Realistic Character Workflow](https://studio.blender.org/training/realistic-human-research/) · [Use of Base Meshes](https://studio.blender.org/training/realistic-human-research/use-of-base-meshes/)

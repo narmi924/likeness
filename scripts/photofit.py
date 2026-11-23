@@ -98,6 +98,14 @@ def visible_points(points, threshold=0.45):
     return {n: p for n, p in points.items() if not n.startswith(hidden)}
 
 
+def _blender_pose(rotation, translation):
+    # OpenCV looks down +Z with +Y down. Blender looks down -Z with +Y up.
+    extrinsic = np.eye(4)
+    extrinsic[:3, :3] = rotation
+    extrinsic[:3, 3] = translation
+    return (np.linalg.inv(extrinsic) @ np.diag([1.0, -1.0, -1.0, 1.0])).tolist()
+
+
 def solve_camera(points3d, points2d, width, height, fov_range=(8, 95), preferred_fov=22.0):
     """Camera position, rotation and focal length (pixels) from matching 3D points and photo pixels.
 
@@ -128,14 +136,112 @@ def solve_camera(points3d, points2d, width, height, fov_range=(8, 95), preferred
     close = [c for c in candidates if c["error"] <= floor * 1.03 + 0.2]
     best = min(close, key=lambda c: abs(c["fov"] - preferred_fov))
     rotation, _ = cv2.Rodrigues(best["rvec"])
-    extrinsic = np.eye(4)
-    extrinsic[:3, :3] = rotation
-    extrinsic[:3, 3] = best["tvec"][:, 0]
-    # OpenCV cameras look down +Z with +Y down; Blender cameras look down -Z with +Y up.
-    flip = np.diag([1.0, -1.0, -1.0, 1.0])
-    matrix = np.linalg.inv(extrinsic) @ flip
-    return {"matrix": matrix.tolist(), "focal_px": best["f"], "fov": best["fov"], "error_px": best["error"],
+    return {"matrix": _blender_pose(rotation, best["tvec"][:, 0]), "focal_px": best["f"], "fov": best["fov"], "error_px": best["error"],
             "sensor_width": 36.0, "lens_mm": best["f"] * 36.0 / width, "width": width, "height": height}
+
+
+def feature_pairs(reference, photo):
+    """Match distinctive details in two photographs, in original top-left pixel coordinates."""
+    import cv2
+    from PIL import Image
+
+    sift = cv2.SIFT_create(nfeatures=7000)
+
+    def features(path):
+        with Image.open(path) as im:
+            gray = im.convert("L")
+            gray.thumbnail((1600, 1600))
+            points, desc = sift.detectAndCompute(np.asarray(gray), None)
+            if desc is None or len(points) < 8:
+                raise ValueError(f"Too few distinctive details in {path}.")
+            xy = np.array([p.pt for p in points]) * np.array(im.size) / np.array(gray.size)
+            return xy, desc
+
+    a, da = features(reference)
+    b, db = features(photo)
+    matcher = cv2.BFMatcher()
+
+    def distinct(src, dst):
+        return {m.queryIdx: m.trainIdx for m, n in matcher.knnMatch(src, dst, k=2)
+                if m.distance < 0.78 * n.distance}
+    reverse = distinct(db, da)
+    pairs = [(i, j) for i, j in distinct(da, db).items() if reverse.get(j) == i]
+    return [(a[i].tolist(), b[j].tolist()) for i, j in pairs]
+
+
+def scene_camera(world, pixels, photo, fov=None, automatic=False):
+    """Robust centered pinhole fit. A flat elevation needs an assumed or known focal length."""
+    import cv2
+    from PIL import Image
+
+    xyz, xy = np.asarray(world, np.float64), np.asarray(pixels, np.float64)
+    minimum = 10 if automatic else 6
+    if len(xyz) < minimum or xyz.shape != (len(xy), 3) or xy.shape != (len(xyz), 2):
+        raise ValueError(f"Need at least {minimum} corresponding surface points spread across the subject.")
+    if not (np.isfinite(xyz).all() and np.isfinite(xy).all()):
+        raise ValueError("Photo and scene points must be finite.")
+    center = xyz.mean(axis=0)
+    xyz = xyz - center
+    spans = np.linalg.svd(xyz, compute_uv=False)
+    if spans[1] < max(1e-8, spans[0] * 0.02):
+        raise ValueError("The anchors lie along a line. Use corners on different edges.")
+    with Image.open(photo) as im:
+        w, h = im.size
+        equiv = im.getexif().get_ifd(34665).get(41989)
+    if fov is not None and not 1 < fov < 175:
+        raise ValueError("Horizontal field of view must be between 1 and 175 degrees.")
+    if fov is not None:
+        source = "specified horizontal field of view"
+    elif equiv:
+        fov = math.degrees(2 * math.atan(w * math.hypot(36, 24) / (2 * float(equiv) * math.hypot(w, h))))
+        source = "35 mm equivalent in EXIF"
+    elif spans[2] < spans[0]*0.025:
+        fov = 50.0
+        source = "assumed 50 degrees for shallow geometry"
+    else:
+        source = "estimated from scene points"
+    angles = [fov] if fov is not None else np.arange(16, 105, 2)
+    # Manually identified corners on a blockout are less exact than matched image features.
+    limit = max(3.0, math.hypot(w, h) * (0.004 if automatic else 0.012))
+    required = max(minimum, math.ceil(len(xy) * (0.25 if automatic else 0.65)))
+    best = None
+    for angle in angles:
+        focal = w / (2 * math.tan(math.radians(angle)/2))
+        k = np.array([[focal,0,w/2],[0,focal,h/2],[0,0,1]], dtype=np.float64)
+        ok, r, t, ids = cv2.solvePnPRansac(xyz, xy, k, None, iterationsCount=350,
+            reprojectionError=limit, confidence=.995, flags=cv2.SOLVEPNP_EPNP)
+        if not ok or len(ids) < required:
+            continue
+        idx = ids.ravel()
+        r, t = cv2.solvePnPRefineLM(xyz[idx], xy[idx], k, None, r, t)
+        rotation = cv2.Rodrigues(r)[0]
+        if np.min(xyz[idx] @ rotation[2] + t[2,0]) <= 0:
+            continue
+        projected = cv2.projectPoints(xyz, r, t, k, None)[0][:,0]
+        error = np.linalg.norm(projected-xy, axis=1)
+        idx = np.flatnonzero(error <= limit)
+        if len(idx) < required:
+            continue
+        spread = cv2.contourArea(cv2.convexHull(xy[idx].astype(np.float32)))
+        if spread < w*h*0.005:
+            continue
+        rms = float(np.sqrt(np.mean(error[idx]**2)))
+        score = (len(idx), -rms)
+        if best is None or score > best[0]:
+            best = score, dict(matrix=_blender_pose(rotation, t[:, 0] - rotation @ center),
+                lens_mm=focal * 36 / w, width=w, height=h, fov=float(angle), focal_source=source,
+                error_px=rms, inliers=idx.tolist(), total=len(xy), residuals=error.tolist(),
+                clip_end=max(1000.0, 5 * float(np.max(xyz[idx] @ rotation[2] + t[2,0]))))
+    if best is None:
+        raise ValueError("No supported photo pose. Use a closer reference view or recheck the scene anchors.")
+    if source == "estimated from scene points":
+        consensus = xyz[best[1]["inliers"]]
+        axes = np.linalg.svd(consensus-consensus.mean(axis=0), compute_uv=False)
+        if axes[2] < 0.025*axes[0]:
+            fixed = scene_camera(world, pixels, photo, fov=50.0, automatic=automatic)
+            fixed["focal_source"] = "assumed 50 degrees for shallow inliers"
+            return fixed
+    return best[1]
 
 
 def main():

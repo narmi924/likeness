@@ -544,11 +544,59 @@ def locate_at(source, name, point, angle="three-quarter", subject=None, camera=N
                   object={"name": name, "library": None}, projection=info["projection"], point=point)
 
 
+def match_scene_photo(args, photo, name):
+    """Recover a reference camera from a blockout or an overlapping aligned photo."""
+    import photofit
+    if args.anchors:
+        anchors = json.loads(Path(args.anchors).read_text(encoding="utf-8-sig"))
+        if not isinstance(anchors, list) or not all(isinstance(a, dict) and "world" in a and "pixel" in a for a in anchors):
+            raise ValueError("Each scene anchor needs a world coordinate and a photo pixel.")
+        world = [a["world"] for a in anchors]
+        pixels = [a["pixel"] for a in anchors]
+    else:
+        if not args.surface:
+            raise ValueError("Name the visible mesh or meshes with --surface for automatic matching.")
+        camera = args.from_camera
+        with tempfile.TemporaryDirectory(prefix="likeness-photo-") as folder:
+            reference = Path(folder) / "reference"
+            worker(args.source, "photo_reference", camera=camera, output=str(reference))
+            pairs = photofit.feature_pairs(reference, photo)
+            point_file = Path(folder) / "pixels.json"
+            point_file.write_text(json.dumps([p[0] for p in pairs]), encoding="utf-8")
+            hits = worker(args.source, "photo_hits", camera=camera, surfaces=args.surface, pixels=str(point_file))
+        world = [hit for hit in hits if hit is not None]
+        pixels = [pair[1] for pair, hit in zip(pairs, hits) if hit is not None]
+    solved = photofit.scene_camera(world, pixels, photo, args.fov, automatic=bool(args.from_camera))
+    script = next_build_script(args.output, "scene-photo-camera")
+    content = (
+        "from pathlib import Path\nimport bpy\nfrom modeling import fit\n\n"
+        f"camera = fit.photo_camera(bpy.context.scene, {name!r}, {solved['matrix']!r}, "
+        f"{solved['lens_mm']!r}, {embed_path(photo, args.output)}, "
+        f"({solved['width']}, {solved['height']}), {{}}, error_px={solved['error_px']!r})\n"
+        f"camera['focal_source'] = {solved['focal_source']!r}\n"
+        f"camera.data.clip_end = {solved['clip_end']!r}\n"
+        "camera.data.background_images[0].image.pack()\n"
+        f"if camera.name != {name!r}:\n    raise ValueError('Choose a new photo camera name.')\n")
+    with script.open("x", encoding="utf-8") as out:
+        out.write(content)
+    saved = edit(args.source, script, args.output, promote=args.promote)
+    if args.anchors:
+        errors = [{"point": a.get("name", i+1), "error_px": round(error, 2),
+                   "inlier": i in solved["inliers"]}
+                  for i, (a, error) in enumerate(zip(anchors, solved["residuals"]))]
+        saved["anchor_errors"] = sorted(errors, key=lambda p: -p["error_px"])
+    return {**saved, "camera": name, "inliers": len(solved["inliers"]), "points": solved["total"],
+            "error_px": round(solved["error_px"], 2), "fov_deg": round(solved["fov"], 2),
+            "focal_source": solved["focal_source"]}
+
+
 def match_photo(args):
-    """Create a camera that reproduces a photograph of a head and remember which mesh vertices its landmarks hit."""
+    """Match a photo to a scene or fit a portrait camera from facial landmarks."""
     import photofit
     photo = Path(args.photo).expanduser().resolve(strict=True)
     name = args.name or f"Photo | {photo.stem}"
+    if not args.head:
+        return match_scene_photo(args, photo, name)
     found = photofit.detect(photo)
     if found is None:
         raise ValueError(f"No face was found in {photo.name}.")
@@ -732,11 +780,16 @@ def main():
     hit.add_argument("--angle", choices=ANGLES, default="three-quarter")
     hit.add_argument("--subject")
     hit.add_argument("--camera")
-    match = commands.add_parser("match-photo", help="Add a camera that reproduces a photograph of the head.")
+    match = commands.add_parser("match-photo", help="Match a Blender camera to a photo of a face, object or place.")
     match.add_argument("source")
     match.add_argument("photo")
     match.add_argument("output")
-    match.add_argument("--head", required=True, help="The face mesh object.")
+    method = match.add_mutually_exclusive_group(required=True)
+    method.add_argument("--head", help="The face mesh object.")
+    method.add_argument("--anchors", help='Scene reference JSON: [{"world":[x,y,z],"pixel":[x,y]}, ...].')
+    method.add_argument("--from-camera", help="Automatically match details in this camera's reference photo.")
+    match.add_argument("--surface", action="append", help="A mesh to use for automatic matches; repeat as needed.")
+    match.add_argument("--fov", type=float, help="Known horizontal field of view in degrees for a scene photo.")
     match.add_argument("--name", help="Camera name, default 'Photo | <photo stem>'.")
     match.add_argument("--angle", choices=ANGLES, default="front", help="Study angle for landmark detection on the model.")
     match.add_argument("--style", choices=STYLES, default="render")

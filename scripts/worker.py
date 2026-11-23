@@ -635,6 +635,7 @@ def render_view(params):
         # A camera that reproduces a photograph renders at the photograph's proportions.
         if chosen.get("photo_size"):
             scene.render.resolution_x, scene.render.resolution_y = [int(v) for v in chosen["photo_size"]]
+            scene.render.pixel_aspect_x = scene.render.pixel_aspect_y = 1
     if params["angle"] == "camera":
         if not scene.camera:
             raise ValueError("The scene has no active camera. Choose a study angle.")
@@ -817,8 +818,8 @@ def compare_view(params):
     result = {"size": size, "left_width": left.shape[1], "right_width": right.shape[1], "panels": len(panels)}
     if params.get("camera"):
         cam = bpy.context.scene.objects.get(params["camera"])
-        if cam and cam.get("photo_landmarks"):
-            from modeling import fit
+        from modeling import fit
+        if cam and fit.photo_points(cam):
             errors = []
             for obj in bpy.context.scene.objects:
                 if obj.type == "MESH" and obj.get("face_landmarks"):
@@ -1033,6 +1034,31 @@ def run(params):
         result = locate_surface(params)
     elif params["action"] == "locate_many":
         result = locate_many(params)
+    elif params["action"] == "photo_reference":
+        import shutil
+        cam = bpy.context.scene.objects.get(params["camera"])
+        if not cam or cam.type != "CAMERA" or not cam.get("photo_size") or not cam.data.background_images:
+            raise ValueError("Choose an existing match-photo camera.")
+        image = cam.data.background_images[0].image
+        if image.packed_file:
+            Path(params["output"]).write_bytes(image.packed_file.data)
+        else:
+            shutil.copyfile(bpy.path.abspath(image.filepath), params["output"])
+        result = {"size": list(image.size)}
+    elif params["action"] == "photo_hits":
+        from modeling import fit
+        scene = bpy.context.scene
+        cam = scene.objects[params["camera"]]
+        surfaces = {scene.objects.get(name) for name in params["surfaces"]}
+        if None in surfaces or any(o.type != "MESH" for o in surfaces):
+            raise ValueError("Each --surface must name a mesh in the scene.")
+        pixels = json.loads(Path(params["pixels"]).read_text(encoding="utf-8"))
+        rays = fit.pixel_rays(scene, cam, dict(enumerate(pixels)))
+        graph = bpy.context.evaluated_depsgraph_get()
+        result = []
+        for origin, direction in rays.values():
+            hit, location, _, _, obj, _ = scene.ray_cast(graph, origin, direction)
+            result.append(list(location) if hit and obj in surfaces else None)
     elif params["action"] == "landmark_world":
         from modeling import fit
         head = bpy.context.scene.objects[params["object"]]

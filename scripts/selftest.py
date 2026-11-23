@@ -241,6 +241,29 @@ def run(quick=False):
         rigged.shape_from_world_delta(head, "Plain", np.zeros_like(pos))
         assert rigged.find_bone.__name__ == "find_bone"
 
+    def photo_occlusion():
+        from modeling import phototexture
+
+        bpy.ops.mesh.primitive_plane_add(size=2, location=(200, 0, 0))
+        wall = bpy.context.object
+        original_uv = wall.data.uv_layers.active.name
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(199.5, 0, 0.6))
+        bpy.context.object.scale = (0.8, 2, 0.1)
+        bpy.ops.object.camera_add(location=(200, 0, 4))
+        camera = bpy.context.object
+        camera.data.lens = 35
+        camera["photo_size"] = [64, 64]
+        image = bpy.data.images.new("Color source", 64, 64, alpha=True)
+        image.generated_color = (0.8, 0.3, 0.2, 1)
+        camera.data.background_images.new().image = image
+        bpy.context.view_layer.update()
+        result = phototexture.project(wall, [camera], size=64)
+        visible = result["visible_texels"][camera.name]
+        covered = visible / (visible + result["unobserved_texels"])
+        assert 0.4 < covered < 0.75, result
+        assert wall.data.uv_layers.active.name == original_uv
+        assert bpy.data.images[result["image"]].packed_file
+
     def architecture():
         wall = building.wall([(0, 0), (4, 0), (4, 3)], openings=[(1.4, 0, 1, 2)])
         assert parts.check_topology(wall)["non_manifold_edges"] == 0
@@ -271,6 +294,7 @@ def run(quick=False):
         ("plants", vegetation),
         ("building", architecture),
         ("mesh / rigged / fit / character shading", characters),
+        ("photo projection behind an occluder", photo_occlusion),
     ):
         exercise(name, fn)
     return {"ok": all(r["status"] == "OK" for r in results), "quick": quick, "modules": results}
