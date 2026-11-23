@@ -1,11 +1,13 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["mcp==1.30.0"]
+# dependencies = ["mcp==1.30.0", "Pillow"]
 # ///
 """Read-only Codex panel for a saved Blender scene or a connected Blender Lab window."""
 
 import asyncio
+import base64
 from collections import OrderedDict
+import json
 from pathlib import Path
 import tempfile
 import uuid
@@ -15,7 +17,7 @@ from mcp.server import Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.stdio import stdio_server
 
-from sources import PROVIDERS, catalog
+from sources import PROVIDERS, catalog, photo_sheet
 from studio import ANGLES, STYLES, capture, file_revision, locate
 
 
@@ -62,11 +64,11 @@ async def list_tools():
         annotations=types.ToolAnnotations(readOnlyHint=True, openWorldHint=False),
     ), types.Tool(
         name="find_references", title="Search photographs and 3D assets",
-        description="Find real reference photographs, models and materials in selected public or connected catalogs. Returns source links, thumbnails when available, author and license.",
+        description="Find photographs, models and materials with source links and credits. Search commons by name, then pass a specific Category: title from a confirmed photo to see more views. Commons-only searches include a numbered preview sheet.",
         inputSchema={"type":"object","additionalProperties":False,"required":["query","providers"],
                      "properties":{"query":{"type":"string","minLength":1},
                                    "providers":{"type":"array","minItems":1,"uniqueItems":True,"items":{"enum":list(PROVIDERS)}},
-                                   "limit":{"type":"integer","minimum":1,"maximum":12,"default":4}}},
+                                   "limit":{"type":"integer","minimum":1,"maximum":24,"default":4}}},
         annotations=types.ToolAnnotations(readOnlyHint=True, openWorldHint=True),
     )]
 
@@ -75,6 +77,13 @@ async def list_tools():
 async def call_tool(name, arguments):
     if name == "find_references":
         result = await asyncio.to_thread(catalog, arguments["query"], arguments["providers"], arguments.get("limit", 4))
+        if arguments["providers"] == ["commons"] and result["commons"].get("matches"):
+            sheet = await asyncio.to_thread(photo_sheet, result["commons"]["matches"])
+            data = {"providers": result}
+            return types.CallToolResult(content=[
+                types.TextContent(type="text", text=json.dumps(data, ensure_ascii=False)),
+                types.ImageContent(type="image", data=base64.b64encode(sheet).decode("ascii"), mimeType="image/jpeg"),
+            ], structuredContent=data)
         return {"providers": result}
     if name == "locate_surface":
         async with render_lock:

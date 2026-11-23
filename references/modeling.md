@@ -24,14 +24,19 @@ Combine techniques on one object. An upholstered chair has rigid joints, a cushi
 
 For downloaded assets, keep the fetch result's `source_line` with the project credits.
 
-For a recognizable subject, start with the supplied references. For missing information, search text and images yourself using the local name, location, model number or year. Open the source page to confirm the subject and version. An architect's elevation, manufacturer's specification or dated event photo can settle questions a gallery of uncaptioned images leaves open. Pick views for distinct jobs: one for silhouette and proportions, another for depth or assembly, a close view for the identifying detail. Stop searching when those modeling decisions are settled. If a defining feature is still ambiguous, ask for the particular view that would resolve it. Infer ordinary hidden construction conservatively and distinguish it from a documented feature when fidelity matters. A generated concept can guide mood or original design; establish a replica's dimensions and markings from real references.
+Start with whatever photographs are available. Search Commons for the local or English place name and the specific feature, or for the exact model and variant. With `find_references`, select only `commons` to see numbered photographs beside the matching source records. The CLI can save the same view with `--sheet`. Open a promising source page and check a distinguishing feature in the photo. From that result's `categories`, search the narrowest one that names the actual subject. For example, one Nikon F3 HP body photograph leads to `Category:Nikon F3HP`, including side views, the HP finder and several crops of the same front view.
+
+For translated or ambiguous names, check the location and description on Wikidata. Its Commons category (P373) can use a different name: the historic Zhaozhou Bridge in Hebei is filed under `Category:Anji Bridge`. A Commons query such as `haswbstatement:P180=Q551446` retrieves files explicitly tagged as depicting that bridge. Many photos lack this tag, so also check the category.
+
+Pick one clear photo for proportions, an overlapping oblique or side view for depth, and a close-up if an identifying detail still needs it. Inspect at original size with `fetch` before fitting geometry. Treat crops of one exposure as a single viewpoint. Check for drawings, obstructions, different revisions and accessories that change the outline. If the subject or a needed view is missing, search the wider web using the local name plus that feature, and check the manufacturer's gallery or manual, architect's project page, or a dated archive. For cameras, check that the page shows the camera body itself. Stop once the modeling decisions are settled. Ask for a particular view only if an unresolved identifying feature matters to the requested result. Infer ordinary hidden construction conservatively. A generated concept can guide mood or original design; establish a replica's dimensions and markings from real references.
 
 Choose a measured dimension or a repeated element of known size. Match the horizon, vanishing directions and camera angle before tracing proportions. For a tower, distinguish roof height from spire height. For a product, distinguish perspective taper from a change in cross-section. A different character adaptation can supply topology; fit its proportions, costume and hair to the intended version.
 
 ```text
 python <skill>/scripts/sources.py accounts
 python <skill>/scripts/sources.py search all "asset or landmark" --limit 4
-python <skill>/scripts/sources.py search commons "architectural detail"
+python <skill>/scripts/sources.py search commons "Nikon F3 HP"
+python <skill>/scripts/sources.py search commons "Category:Nikon F3HP" --limit 24 --sheet tmp/f3hp-views.jpg
 python <skill>/scripts/sources.py search sketchfab "asset name" --limit 8
 python <skill>/scripts/sources.py search blenderkit "asset name" --kind model
 python <skill>/scripts/sources.py search polyhaven "limestone" --kind textures

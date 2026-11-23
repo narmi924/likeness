@@ -2,6 +2,8 @@
 
 import argparse
 import concurrent.futures
+from http.client import HTTPException
+import io
 import json
 import os
 from pathlib import Path
@@ -150,17 +152,63 @@ def search(provider, term, limit, kind=None):
         data = api(CG, {"q": term, "limit": limit, "type": "Material"})
         return [dict(id="ambientcg:" + a["assetId"], name=a.get("displayName"), author="ambientCG",
                      license="CC0", url="https://ambientcg.com/view?id=" + a["assetId"]) for a in data.get("foundAssets", [])]
+    if term.startswith("Category:"):
+        category = term.removeprefix("Category:").strip()
+        term = "incategory:" + json.dumps(category, ensure_ascii=False)
     data = api("https://commons.wikimedia.org/w/api.php", dict(action="query", generator="search",
-               gsrsearch=term + " filetype:bitmap", gsrnamespace=6, gsrlimit=limit, prop="imageinfo",
-               iiprop="url|extmetadata", iiurlwidth=480, format="json", formatversion=2))
+               gsrsearch=term + " filetype:bitmap", gsrnamespace=6, gsrlimit=limit, prop="imageinfo|categories",
+               clshow="!hidden", cllimit="max", iiprop="url|size|extmetadata", iiextmetadatafilter="Artist|LicenseShortName",
+               iiurlwidth=330, format="json", formatversion=2))
+    if "error" in data:
+        raise ValueError(data["error"]["info"])
     items = []
-    for page in data.get("query", {}).get("pages", []):
+    for page in sorted(data.get("query", {}).get("pages", []), key=lambda p: p["index"]):
+        if not page.get("imageinfo"):
+            continue
         info = page["imageinfo"][0]
         meta = info.get("extmetadata", {})
-        items.append(dict(id="commons:" + page["title"], name=page["title"], url=info["descriptionurl"],
+        items.append(dict(number=len(items) + 1, id="commons:" + page["title"], name=page["title"], url=info["descriptionurl"],
+                          categories=[c["title"] for c in page.get("categories", [])], width=info["width"], height=info["height"],
                           image=info["url"], thumbnail=info.get("thumburl"), author=re.sub("<[^>]+>", "", meta.get("Artist", {}).get("value", "")),
                           license=meta.get("LicenseShortName", {}).get("value")))
     return items
+
+
+def photo_sheet(matches):
+    """Render a numbered JPEG from the Commons thumbnails, preserving the full frame."""
+    try:
+        from PIL import Image, ImageDraw, ImageOps
+    except ImportError as exc:
+        raise ValueError("Reference preview sheets require Pillow (python -m pip install Pillow).") from exc
+
+    def preview(item):
+        if item.get("thumbnail"):
+            try:
+                req = request.Request(item["thumbnail"], headers={"User-Agent": AGENT})
+                with request.urlopen(req, timeout=8) as remote:
+                    with Image.open(io.BytesIO(remote.read(2 * 1024 * 1024))) as original:
+                        tile = ImageOps.exif_transpose(original).convert("RGB")
+                        tile.thumbnail((236, 166), Image.Resampling.LANCZOS)
+                        return tile
+            except (OSError, HTTPException, ValueError, Image.DecompressionBombError):
+                pass
+        return None
+
+    columns = min(4, len(matches))
+    rows = (len(matches) + columns - 1) // columns
+    sheet = Image.new("RGB", (columns * 244, rows * 192), "#f2f2f2")
+    draw = ImageDraw.Draw(sheet)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        for i, tile in enumerate(pool.map(preview, matches)):
+            x, y = (i % columns) * 244, (i // columns) * 192
+            if tile is None:
+                draw.text((x + 8, y + 76), "Preview unavailable", fill="black")
+            else:
+                sheet.paste(tile, (x + (244 - tile.width) // 2, y + (170 - tile.height) // 2))
+            draw.text((x + 8, y + 171), str(matches[i]["number"]), fill="black")
+    out = io.BytesIO()
+    sheet.save(out, format="JPEG", quality=88)
+    return out.getvalue()
 
 
 def catalog(term, providers, limit=4, kind=None):
@@ -437,6 +485,7 @@ if __name__ == "__main__":
     s.add_argument("query")
     s.add_argument("--kind")
     s.add_argument("--limit", type=int, default=8)
+    s.add_argument("--sheet", type=Path, help="Save a numbered JPEG of the Commons results.")
     marks = cmds.add_parser("landmarks", help="Face landmarks of a photograph in pixels.")
     marks.add_argument("image")
     marks.add_argument("output", nargs="?")
@@ -475,7 +524,16 @@ if __name__ == "__main__":
                 result = {"file": str(out.resolve()), "points": len(result["points"])}
         elif opt.op == "search":
             limit = min(50, max(1, opt.limit))
+            if opt.sheet and (opt.provider != "commons" or opt.sheet.suffix.lower() not in {".jpg", ".jpeg"}):
+                cli.error("--sheet expects a .jpg output path and the commons provider.")
+            if opt.sheet and opt.sheet.exists():
+                raise FileExistsError(f"Choose a new preview sheet path: {opt.sheet}")
             result = catalog(opt.query, PROVIDERS, limit) if opt.provider == "all" else search(opt.provider, opt.query, limit, opt.kind)
+            if opt.sheet and result:
+                sheet = photo_sheet(result)
+                opt.sheet.parent.mkdir(parents=True, exist_ok=True)
+                with opt.sheet.open("xb") as output:
+                    output.write(sheet)
         else:
             result = fetch(opt.asset, opt.directory, opt.resolution)
         print(json.dumps(result, indent=2, ensure_ascii=False))

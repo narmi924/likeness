@@ -180,7 +180,7 @@ def main(argv):
         # Debian and Ubuntu keep the system Python for apt (PEP 668): pip refuses, apt does it
         after["next"] = ("sudo apt install python3-numpy python3-pil" if Path("/etc/debian_version").exists()
                          else f"{sys.executable} -m pip install numpy pillow")
-        after["why"] = "numpy and Pillow are needed by `likeness place` and `likeness plan` only"
+        after["why"] = "Map and plan commands use numpy and Pillow. Reference photo sheets also use Pillow."
     print(json.dumps(after, indent=2, ensure_ascii=False))
 
 
